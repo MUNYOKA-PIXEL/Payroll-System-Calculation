@@ -1,4 +1,6 @@
 import os
+import argparse
+import logging
 
 # --- CALCULATION FUNCTIONS ---
 def calculate_tax(salary):
@@ -68,109 +70,73 @@ def get_salary_breakdown(salary):
     }
 
 # --- FILE WRITING AND GENERATION ---
-def generate_and_save_records():
-    """Generates records from the fixed sample list and saves to file."""
-    filename = "payroll_report.txt"
-    
-    # Updated list with Names and Fixed Salaries
-    sample_employees = [
-        ("Peter Ilunga", 53400.00),
-        ("Jane Kyakilika", 880000.00),
-        ("Alice Kalekesha", 23500.00),
-        ("Linguja LInguja", 1555000.00),
-        ("Esther Liswan", 56800.00),
-        ("Evans Ngosa", 56700.00),
-        ("Frank Mumba", 67800.00),
-        ("Ireen Mants", 555000.00),
-        ("Henry Mwanza", 678090.00),
-        ("Saidati Ebeni", 98400.00),
-        ("Debora Mutenda", 422100.00),
-        ("Niza Sikapizie", 78900.00),
-    ]
+SAMPLE_EMPLOYEES = [
+    ("Peter Ilunga", 53400.00),
+    ("Jane Kyakilika", 880000.00),
+    ("Alice Kalekesha", 23500.00),
+    ("Linguja LInguja", 1555000.00),
+    ("Esther Liswan", 56800.00),
+    ("Evans Ngosa", 56700.00),
+    ("Frank Mumba", 67800.00),
+    ("Ireen Mants", 555000.00),
+    ("Henry Mwanza", 678090.00),
+    ("Saidati Ebeni", 98400.00),
+    ("Debora Mutenda", 422100.00),
+    ("Niza Sikapizie", 78900.00),
+]
 
-    print(f"\nGenerating records for {len(sample_employees)} employees...")
-    
+
+def generate_and_save_records(filename="payroll_report.txt", employees=None):
+    """Generates records from the sample list and saves to a CSV-like file.
+
+    Returns the path to the generated file.
+    """
+    if employees is None:
+        employees = SAMPLE_EMPLOYEES
+
+    logging.info("Generating records for %d employees...", len(employees))
+
     try:
-        with open(filename, "w") as file:
-            # Write the Header to the file
-            header = f" | {'Name':<15} | {'Gross Salary':>12} | {'PAYE Tax':>10} | {'NHIF':>8} | {'NSSF':>8} | {'Housing':>10} | {'Net Salary':>12} |\n"
-            divider = "-" * 97 + "\n"
-            
-            file.write("COMPANY PAYROLL REPORT\n")
-            file.write(divider)
+        with open(filename, "w", encoding="utf-8") as file:
+            # Write the Header to the file (CSV style)
+            header = "Name,Gross,Tax,NHIF,NSSF,Housing,Total Deductions,Net\n"
             file.write(header)
-            file.write(divider)
-            
-            # Print header to console as well
-            print("-" * 97)
-            print(header.strip())
-            print("-" * 97)
-            
-            # Loop through the specific list of tuples (name, salary)
-            for name, salary in sample_employees:
-                
-                # Calculate breakdown using the fixed salary
-                data = get_salary_breakdown(salary)
-                
-                # Format the line string
-                line = (f" | {name:<15} | "
-                        f"{data['gross']:>12,.2f} | "
-                        f"{data['tax']:>10,.2f} | "
-                        f"{data['nhif']:>8,.2f} | "
-                        f"{data['nssf']:>8,.2f} | "
-                        f"{data['housing']:>10,.2f} | "
-                        f"{data['net']:>12,.2f} | \n")
-                
-                # Write to file
-                file.write(line)
-                
-                # Print to console for immediate feedback
-                print(line.strip())
-                
-            file.write(divider)
-            print("-" * 97)
-            print(f"\nSUCCESS: Records have been saved to '{filename}'.")
-            
-            # Display absolute path for clarity
-            print(f"File location: {os.path.abspath(filename)}")
-            
-    except IOError as e:
-        print(f"Error writing to file: {e}")
 
-# --- MAIN PROGRAM MENU ---
+            for name, salary in employees:
+                breakdown = get_salary_breakdown(salary)
+                line = (
+                    f'{name},{breakdown["gross"]:.2f},{breakdown["tax"]:.2f},'
+                    f'{breakdown["nhif"]:.2f},{breakdown["nssf"]:.2f},'
+                    f'{breakdown["housing"]:.2f},{breakdown["total_deductions"]:.2f},'
+                    f'{breakdown["net"]:.2f}\n'
+                )
+                file.write(line)
+
+        logging.info("Saved payroll report to %s", filename)
+        return os.path.abspath(filename)
+
+    except Exception as e:
+        logging.exception("Failed to generate or save records: %s", e)
+        raise
+
+
 def main():
-    while True:
-        print("\n--- PAYROLL SYSTEM MENU ---")
-        print("1. Generate Employee Records from List (Save to File)")
-        print("2. Calculate Single Salary (Manual Input)")
-        print("3. Exit")
-        
-        choice = input("Enter choice (1-3): ")
-        
-        if choice == '1':
-            generate_and_save_records()
-        elif choice == '2':
-            try:
-                salary = float(input("\nEnter your Salary: "))
-                if salary <= 0:
-                    print("Salary must be a positive number.")
-                else:
-                    data = get_salary_breakdown(salary)
-                    print(" \n Salary Breakdown")
-                    print(f"Gross Salary: KSh {data['gross']:,.2f}")
-                    print(f"PAYE Tax:     KSh {data['tax']:,.2f}")
-                    print(f"NHIF Levy:    KSh {data['nhif']:,.2f}")
-                    print(f"NSSF Levy:    KSh {data['nssf']:,.2f}")
-                    print(f"Housing Levy: KSh {data['housing']:,.2f}")
-                    print(f"Total Ded.:   KSh {data['total_deductions']:,.2f}")
-                    print(f"Net Salary:   KSh {data['net']:,.2f}")
-            except ValueError:
-                print("Invalid input! Please enter a numeric salary.")
-        elif choice == '3':
-            print("Exiting program.")
-            break
-        else:
-            print("Invalid choice. Please try again.")
+    parser = argparse.ArgumentParser(description="Generate payroll report")
+    parser.add_argument("--output", "-o", default="payroll_report.txt", help="Output filename")
+    parser.add_argument("--print", action="store_true", help="Print generated report to stdout")
+    args = parser.parse_args()
+
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+    output_path = generate_and_save_records(filename=args.output)
+
+    print(f"Report written to: {output_path}")
+
+    if args.print:
+        print("\n---- Report contents ----\n")
+        with open(output_path, "r", encoding="utf-8") as f:
+            print(f.read())
+
 
 if __name__ == "__main__":
     main()
